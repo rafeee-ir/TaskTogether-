@@ -1,0 +1,125 @@
+{
+  "entities": {
+    "SimulatedTask": {
+      "title": "SimulatedTask",
+      "description": "Represents a household chore or task",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "workspaceId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "priority": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
+        "status": { "type": "string", "enum": ["Pending", "In Progress", "Completed"] },
+        "creator": { "type": "string" },
+        "assignedUser": { "type": "string" },
+        "creationDate": { "type": "number" },
+        "dueDate": { "type": "string" },
+        "isCompleted": { "type": "boolean" },
+        "attachments": { "type": "array" },
+        "comments": { "type": "array" },
+        "isArchived": { "type": "boolean" }
+      },
+      "required": ["id", "workspaceId", "title", "priority", "status", "creator", "assignedUser", "dueDate", "creationDate"]
+    },
+    "SimulatedMessage": {
+      "title": "SimulatedMessage",
+      "description": "Represents a group chat message in the household sync system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "workspaceId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderRole": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "text": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "fileAttachment": { "type": "object" },
+        "timestamp": { "type": "number" },
+        "status": { "type": "string", "enum": ["sent", "delivered", "read"] },
+        "readBy": { "type": "array" },
+        "isAi": { "type": "boolean" }
+      },
+      "required": ["id", "workspaceId", "senderName", "text", "timestamp"]
+    },
+    "TypingStatus": {
+      "title": "TypingStatus",
+      "description": "Represents real-time status of family members typing a message",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "isTyping": { "type": "boolean" }
+      },
+      "required": ["uid", "name", "timestamp", "isTyping"]
+    },
+    "FamilyNotification": {
+      "title": "FamilyNotification",
+      "description": "Represents a synchronization notification dispatched to household members",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["NEW_TASK", "TASK_ASSIGNED", "TASK_COMPLETED", "NEW_MESSAGE", "NEW_MEMBER"] },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "type", "title", "message", "timestamp"]
+    },
+    "SimulatedWorkspace": {
+      "title": "SimulatedWorkspace",
+      "description": "Represents a family workspace",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "inviteCode": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "memberNames": { "type": "array" }
+      },
+      "required": ["id", "name", "inviteCode", "memberNames"]
+    },
+    "WorkspaceMember": {
+      "title": "WorkspaceMember",
+      "description": "Represents a member registered within a workspace",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "workspaceId": { "type": "string" },
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "role": { "type": "string", "enum": ["owner", "admin", "member"] }
+      },
+      "required": ["id", "workspaceId", "uid", "name", "email", "avatarUrl", "role"]
+    }
+  },
+  "firestore": {
+    "/tasks/{taskId}": {
+      "schema": "SimulatedTask",
+      "description": "Collection of tasks/chores in the household"
+    },
+    "/messages/{messageId}": {
+      "schema": "SimulatedMessage",
+      "description": "Collection of real-time messages in the chat room"
+    },
+    "/typing/{userId}": {
+      "schema": "TypingStatus",
+      "description": "Real-time presence database mapping currently active typing members"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "FamilyNotification",
+      "description": "Central ledger of unread and read push notifications"
+    },
+    "/workspaces/{workspaceId}": {
+      "schema": "SimulatedWorkspace",
+      "description": "Collection of workspaces sharing chores and checklists"
+    },
+    "/members/{memberId}": {
+      "schema": "WorkspaceMember",
+      "description": "Collection of members linked to family workspaces"
+    }
+  }
+}

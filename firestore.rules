@@ -1,0 +1,146 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Pillar 1: Default safety catch-all net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Check if user is a member of the given workspace
+    function isWorkspaceMember(workspaceId) {
+      return isSignedIn() && (
+        workspaceId == "sweet-home" ||
+        exists(/databases/$(database)/documents/members/$(workspaceId)_$(request.auth.uid))
+      );
+    }
+
+    // Check if user is administrative/owner of the workspace
+    function isWorkspaceAdmin(workspaceId) {
+      return isSignedIn() && (
+        workspaceId == "sweet-home" ||
+        get(/databases/$(database)/documents/members/$(workspaceId)_$(request.auth.uid)).data.role in ['owner', 'admin']
+      );
+    }
+
+    // TASK VALIDATION BLUEPRINT & SECURE RULES
+    match /tasks/{taskId} {
+      allow read: if isSignedIn() && isWorkspaceMember(resource.data.workspaceId);
+      
+      allow create: if isSignedIn() 
+        && isValidId(taskId)
+        && request.resource.data.id == taskId
+        && isWorkspaceMember(request.resource.data.workspaceId)
+        && isValidTask(request.resource.data);
+
+      allow update: if isSignedIn()
+        && isWorkspaceMember(resource.data.workspaceId)
+        && isValidTask(request.resource.data)
+        && (
+          // Workspace administrator/owner can update any task fields
+          isWorkspaceAdmin(resource.data.workspaceId) ||
+          // Normal member can ONLY change task status/completion fields (Anti-Update-Gap)
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'isCompleted', 'comments'])
+        );
+
+      allow delete: if isSignedIn() && isWorkspaceAdmin(resource.data.workspaceId);
+    }
+
+    function isValidTask(task) {
+      return task.id is string && task.id.size() <= 128
+        && task.workspaceId is string && task.workspaceId.size() <= 128
+        && task.title is string && task.title.size() >= 1 && task.title.size() <= 150
+        && task.description is string && task.description.size() <= 1000
+        && task.priority in ['LOW', 'MEDIUM', 'HIGH']
+        && task.status in ['Pending', 'In Progress', 'Completed']
+        && task.creator is string && task.creator.size() <= 100
+        && task.assignedUser is string && task.assignedUser.size() <= 100
+        && task.creationDate is number
+        && task.dueDate is string && task.dueDate.size() <= 20;
+    }
+
+    // MESSAGE VALIDATION BLUEPRINT & SECURE RULES
+    match /messages/{messageId} {
+      allow read: if isSignedIn() && isWorkspaceMember(resource.data.workspaceId);
+      
+      allow create: if isSignedIn()
+        && isValidId(messageId)
+        && request.resource.data.id == messageId
+        && isWorkspaceMember(request.resource.data.workspaceId)
+        && isValidMessage(request.resource.data);
+
+      allow update: if false; // Messages remain immutable inside the archive log
+      allow delete: if isSignedIn() && isWorkspaceAdmin(resource.data.workspaceId);
+    }
+
+    function isValidMessage(msg) {
+      return msg.id is string && msg.id.size() <= 128
+        && msg.workspaceId is string && msg.workspaceId.size() <= 128
+        && msg.senderName is string && msg.senderName.size() <= 100
+        && msg.text is string && msg.text.size() >= 1 && msg.text.size() <= 5000
+        && msg.timestamp is number;
+    }
+
+    // TYPING STATUS SECURE RULES
+    match /typing/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // NOTIFICATIONS SECURE RULES
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(notificationId) && request.resource.data.id == notificationId;
+      allow update, delete: if isSignedIn();
+    }
+
+    // WORKSPACES SECURE RULES
+    match /workspaces/{workspaceId} {
+      allow read: if isSignedIn() && isWorkspaceMember(workspaceId);
+      
+      allow create: if isSignedIn() 
+        && isValidId(workspaceId) 
+        && request.resource.data.id == workspaceId
+        && request.resource.data.ownerUid == request.auth.uid;
+
+      allow update: if isSignedIn() && isWorkspaceAdmin(workspaceId);
+      allow delete: if isSignedIn() && isWorkspaceAdmin(workspaceId);
+    }
+
+    // MEMBERS SECURE RULES
+    match /members/{memberId} {
+      allow read: if isSignedIn() && isWorkspaceMember(resource.data.workspaceId);
+      
+      // Joining or creating member record under workspaceId
+      allow create: if isSignedIn()
+        && isValidId(memberId)
+        && request.resource.data.id == memberId
+        && (
+          // First member/owner creating the workspace
+          request.resource.data.uid == request.auth.uid ||
+          // Or joining an existing workspace via invite code configuration 
+          exists(/databases/$(database)/documents/workspaces/$(request.resource.data.workspaceId))
+        );
+
+      // Admins/owners of the workspace can manage roles
+      allow update: if isSignedIn() 
+        && isWorkspaceAdmin(resource.data.workspaceId)
+        && (request.resource.data.role in ['owner', 'admin', 'member']);
+
+      // Only owners or the user themselves can remove membership
+      allow delete: if isSignedIn() && (
+        isWorkspaceAdmin(resource.data.workspaceId) || 
+        resource.data.uid == request.auth.uid
+      );
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "TaskTogether",
+  "description": "An interactive Android device preview and clean Kotlin/Jetpack Compose source code explorer for the TaskTogether family task app, featuring live dual-language layouts, theme switching, real-time shared tasks, and dynamic chat simulation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
